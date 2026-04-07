@@ -155,37 +155,32 @@
 </div>
 
 <script>
-    // *** นำ URL ที่ก๊อปมาจาก Google Apps Script มาวางตรงนี้ ***
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx6CIA4pkTCiQuM9scEu5x7Oj6pXOhIBnh5nfgEuLCI334R0_erirttlkCDAzVf_Zkflg/exec"; 
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzeZTrCejmrrkxiQmRUVdohGXgBRB50iMFFpuTwoQsnR-7C4oIueHd_g7-vgFxiduokBQ/exec"; // *** อย่าลืมวาง URL ใหม่ ***
 
-    const defaultList = [
-        "อ้ายแจ็ก", "อ้ายทรัพย์", "อ้ายเจ๊ก", "อ้ายบู", 
-        "จ่าเบนซ์", "จ่าเน", "จ่าแบงค์", "จ่าบราว", 
-        "จ่าแซก", "หมู่เฟิร์ส", "หมู่แฮน"
-    ];
-
-    let officers = defaultList.map(name => ({ name, hasGone: false }));
+    let officers = []; // เริ่มต้นเป็น Array ว่าง
     let history = [];
 
-    // ดึงข้อมูลจาก Google Sheets เมื่อเปิดแอป
-   async function loadData() {
-    try {
-        // เติม ?t=... เพื่อป้องกันการจำค่าเก่า (Cache)
-        const response = await fetch(SCRIPT_URL + "?t=" + new Date().getTime());
-        const data = await response.json();
-        if (data.officers && data.officers.length > 0) {
+    async function loadData() {
+        try {
+            // แสดงสถานะโหลดในคอนโซลเพื่อเช็ก
+            console.log("กำลังโหลดข้อมูลจาก Google Sheets...");
+            const response = await fetch(SCRIPT_URL);
+            const data = await response.json();
+            
             officers = data.officers;
-        }
-        if (data.history) {
             history = data.history;
+            
+            console.log("โหลดสำเร็จ:", officers.length, "รายชื่อ");
+            updateUI();
+        } catch (e) {
+            console.error("โหลดข้อมูลไม่สำเร็จ:", e);
+            alert("ไม่สามารถดึงข้อมูลจากเซิร์ฟเวอร์ได้");
         }
-        updateUI();
-    } catch (e) {
-        console.error("โหลดข้อมูลไม่สำเร็จ", e);
-        // หากโหลดไม่ได้ ให้ใช้รายชื่อเริ่มต้นเพื่อให้แอปยังทำงานได้
-        updateUI(); 
     }
-}
+
+    // ฟังก์ชันอื่นๆ (confirmDuty, updateUI, renderStatus) ให้ใช้ตามเดิม
+    // และจบด้วยการเรียกใช้:
+    loadData();
 </script>
 
 </body>
