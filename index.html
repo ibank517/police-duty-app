@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจัดเวรรับตัวผู้ต้องหา v3.0</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #e74c3c;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --info: #3498db;
+            --line: #00b900;
+            --bg: #f4f7f6;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, 'Sarabun', sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 15px;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container { max-width: 500px; margin: auto; }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        h2, h3 { color: var(--primary); text-align: center; margin-top: 0; }
+
+        label { display: block; margin-top: 10px; font-weight: bold; font-size: 0.9em; color: #555; }
+
+        select, input {
+            width: 100%;
+            padding: 12px;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+            background-color: #fff;
+            appearance: none; /* สำหรับมือถือเพื่อให้ดูสะอาดตา */
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:active { transform: scale(0.98); opacity: 0.9; }
+
+        .btn-confirm { background-color: var(--success); }
+        .btn-undo { background-color: var(--warning); font-size: 14px; width: auto; margin: 0; padding: 8px 15px; }
+        .btn-reset { background-color: #95a5a6; margin-top: 40px; font-size: 12px; opacity: 0.7; }
+        
+        .action-buttons { display: flex; gap: 5px; margin-top: 10px; }
+        .btn-sm { padding: 8px; font-size: 12px; flex: 1; margin: 0; }
+        .btn-line { background-color: var(--line); }
+        .btn-copy { background-color: var(--info); }
+
+        .status-badge {
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: bold;
+        }
+        .available { background: #d4edda; color: #155724; }
+        .busy { background: #f8d7da; color: #721c24; }
+
+        .history-item {
+            background: #fff;
+            border-left: 5px solid var(--primary);
+            padding: 15px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        
+        .progress-container {
+            background: #e0e0e0;
+            border-radius: 10px;
+            height: 10px;
+            width: 100%;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .progress-bar {
+            background: var(--success);
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <h2>🚓 จัดเวรรับตัว</h2>
+        
+        <label>📍 จังหวัดปลายทาง</label>
+        <input type="text" id="destination" placeholder="พิมพ์ชื่อจังหวัด...">
+
+        <label>👮 เลือกเจ้าหน้าที่ (3-4 คน)</label>
+        <div id="selectors">
+            <select class="officer-select" id="p1"></select>
+            <select class="officer-select" id="p2"></select>
+            <select class="officer-select" id="p3"></select>
+            <select class="officer-select" id="p4"></select>
+        </div>
+
+        <button class="btn btn-confirm" onclick="confirmDuty()">💾 บันทึกและส่งชื่อ</button>
+    </div>
+
+    <div class="card">
+        <div class="flex-between">
+            <h3 style="margin:0">📊 สถานะการวนรอบ</h3>
+            <span id="progressText" style="font-size: 0.8em; font-weight: bold;">0/11</span>
+        </div>
+        <div class="progress-container">
+            <div id="progressBar" class="progress-bar"></div>
+        </div>
+        <div id="officerStatus" style="margin-top: 15px;"></div>
+    </div>
+
+    <div class="flex-between" style="margin-bottom: 10px;">
+        <h3 style="margin: 0;">📜 ประวัติล่าสุด</h3>
+        <button class="btn btn-undo" onclick="undoLastDuty()">↩️ แก้ไขล่าสุด</button>
+    </div>
+    
+    <div id="historyList"></div>
+
+    <button class="btn btn-reset" onclick="clearAllData()">ล้างข้อมูลแอปทั้งหมด</button>
+</div>
+
+<script>
+    // --- 1. ข้อมูลและระบบ Storage ---
+    const defaultList = [
+        "อ้ายแจ็ก", "อ้ายทรัพย์", "อ้ายเจ๊ก", "อ้ายบู", 
+        "จ่าเบนซ์", "จ่าเน", "จ่าแบงค์", "จ่าบราว", 
+        "จ่าแซก", "หมู่เฟิร์ส", "หมู่แฮน"
+    ];
+
+    let officers = JSON.parse(localStorage.getItem('police_duty_v3')) || 
+                   defaultList.map(name => ({ name, hasGone: false }));
+    
+    let history = JSON.parse(localStorage.getItem('police_history_v3')) || [];
+
+    function saveData() {
+        localStorage.setItem('police_duty_v3', JSON.stringify(officers));
+        localStorage.setItem('police_history_v3', JSON.stringify(history));
+    }
+
+    // --- 2. การจัดการ UI ---
+    function updateSelectors() {
+        const selects = document.querySelectorAll('.officer-select');
+        const available = officers.filter(o => !o.hasGone);
+
+        selects.forEach((sel, i) => {
+            const current = sel.value;
+            sel.innerHTML = `<option value="">-- เลือกคนที่ ${i+1} ${i==3 ? '(ถ้ามี)' : ''} --</option>`;
+            available.forEach(off => {
+                sel.innerHTML += `<option value="${off.name}">${off.name}</option>`;
+            });
+            sel.value = current;
+        });
+    }
+
+    function renderStatus() {
+        const container = document.getElementById('officerStatus');
+        const goneCount = officers.filter(o => o.hasGone).length;
+        const total = officers.length;
+        
+        // Update Progress
+        const percent = (goneCount / total) * 100;
+        document.getElementById('progressBar').style.width = percent + '%';
+        document.getElementById('progressText').innerText = `${goneCount} / ${total} คน`;
+
+        container.innerHTML = officers.map(o => `
+            <div style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                <span>${o.name}</span>
+                <span class="status-badge ${o.hasGone ? 'busy' : 'available'}">
+                    ${o.hasGone ? 'ไปแล้ว' : 'ว่าง'}
+                </span>
+            </div>
+        `).join('');
+
+        if (goneCount === total && total > 0) {
+            setTimeout(() => {
+                alert("✅ ครบทุกคนแล้ว! ระบบจะเริ่มรอบใหม่ให้ทันที");
+                officers.forEach(o => o.hasGone = false);
+                saveData();
+                updateUI();
+            }, 600);
+        }
+    }
+
+    function confirmDuty() {
+        const dest = document.getElementById('destination').value.trim();
+        const selected = [
+            document.getElementById('p1').value,
+            document.getElementById('p2').value,
+            document.getElementById('p3').value,
+            document.getElementById('p4').value
+        ].filter(n => n !== "");
+
+        if (!dest) return alert("กรุณาระบุจังหวัดปลายทาง");
+        if (selected.length < 3) return alert("ต้องเลือกอย่างน้อย 3 คน");
+        if (new Set(selected).size !== selected.length) return alert("ห้ามเลือกชื่อซ้ำกัน!");
+
+        const time = new Date().toLocaleString('th-TH', { 
+            dateStyle: 'medium', timeStyle: 'short', hour12: false 
+        });
+        
+        history.unshift({ dest, names: selected.join(', '), time });
+
+        selected.forEach(name => {
+            const off = officers.find(o => o.name === name);
+            if (off) off.hasGone = true;
+        });
+
+        document.getElementById('destination').value = '';
+        document.querySelectorAll('.officer-select').forEach(s => s.value = '');
+
+        saveData();
+        updateUI();
+    }
+
+    function undoLastDuty() {
+        if (history.length === 0) return;
+        if (confirm("ยกเลิกรายการล่าสุดและคืนสถานะเจ้าหน้าที่ใช่ไหม?")) {
+            const last = history[0].names.split(', ');
+            last.forEach(name => {
+                const off = officers.find(o => o.name === name.trim());
+                if (off) off.hasGone = false;
+            });
+            history.shift();
+            saveData();
+            updateUI();
+        }
+    }
+
+    function shareToLine(dest, names, time) {
+        const msg = `📢 รายงานเวรรับตัว\n📍 จ. ${dest}\n👥 ${names}\n🕒 ${time}`;
+        window.open(`https://line.me/R/msg/text/?${encodeURIComponent(msg)}`, '_blank');
+    }
+
+    function copyToClipboard(dest, names, time) {
+        const msg = `📢 รายงานเวรรับตัว\n📍 จ. ${dest}\n👥 ${names}\n🕒 ${time}`;
+        navigator.clipboard.writeText(msg).then(() => alert("📋 คัดลอกแล้ว!"));
+    }
+
+    function renderHistory() {
+        const list = document.getElementById('historyList');
+        list.innerHTML = history.map(h => `
+            <div class="history-item">
+                <strong>📍 ${h.dest}</strong><br>
+                <span style="font-size:0.9em; color:#444;">👥 ${h.names}</span><br>
+                <small style="color: #999;">🕒 ${h.time}</small>
+                <div class="action-buttons">
+                    <button class="btn btn-sm btn-line" onclick="shareToLine('${h.dest}', '${h.names}', '${h.time}')">🟢 LINE</button>
+                    <button class="btn btn-sm btn-copy" onclick="copyToClipboard('${h.dest}', '${h.names}', '${h.time}')">📋 ก๊อปปี้</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function clearAllData() {
+        if(confirm("ต้องการล้างข้อมูลทั้งหมดเพื่อเริ่มรอบใหม่ใช่หรือไม่? (ประวัติจะหายหมด)")) {
+            localStorage.clear();
+            location.reload();
+        }
+    }
+
+    function updateUI() {
+        renderStatus();
+        updateSelectors();
+        renderHistory();
+    }
+
+    updateUI();
+</script>
+
+</body>
+</html>
