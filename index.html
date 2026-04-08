@@ -3,37 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบเวรตำรวจ v6.0 (เพิ่มวันที่)</title>
+    <title>ระบบเวรตำรวจ v7.0 (Full Database & History Management)</title>
     <style>
-        :root { --p: #2c3e50; --s: #27ae60; --w: #f39c12; --bg: #f4f7f6; }
-        body { font-family: 'Sarabun', sans-serif; background: var(--bg); padding: 15px; margin: 0; }
+        :root { --p: #2c3e50; --s: #27ae60; --w: #f39c12; --d: #e74c3c; --bg: #f4f7f6; }
+        body { font-family: 'Sarabun', sans-serif; background: var(--bg); padding: 15px; margin: 0; padding-bottom: 50px; }
         .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); display: none; justify-content: center; align-items: center; z-index: 100; font-weight: bold; }
-        select, input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
-        button { width: 100%; padding: 15px; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .btn-ok { background: var(--s); }
-        .btn-reset { background: var(--w); width: auto; padding: 5px 10px; margin: 0; font-size: 14px; }
-        .btn-line { background: #00b900; padding: 8px 12px; font-size: 12px; width: auto; margin: 0; }
+        
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); display: none; justify-content: center; align-items: center; z-index: 100; font-weight: bold; color: var(--p); }
+        
+        label { font-weight: bold; color: #555; font-size: 0.9em; display: block; margin-top: 10px; }
+        select, input { width: 100%; padding: 12px; margin: 5px 0 10px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        
+        button { width: 100%; padding: 15px; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:active { transform: scale(0.98); }
+        
+        .btn-ok { background: var(--s); margin-top: 10px; }
+        .btn-reset { background: var(--w); width: auto; padding: 5px 12px; font-size: 13px; }
+        .btn-line { background: #00b900; padding: 8px 15px; font-size: 13px; width: auto; }
+        .btn-del { background: var(--d); padding: 8px 12px; font-size: 13px; width: auto; }
+        .btn-clear-all { background: #34495e; margin-bottom: 15px; font-size: 14px; padding: 10px; }
+
         .status-badge { padding: 3px 8px; border-radius: 10px; font-size: 0.8em; font-weight: bold; }
         .available { background: #d4edda; color: #155724; }
         .busy { background: #f8d7da; color: #721c24; }
-        .history-item { border-left: 5px solid var(--p); background: #fff; padding: 12px; margin-top: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .flex-between { display: flex; justify-content: space-between; align-items: center; }
-        label { font-weight: bold; color: #555; font-size: 0.9em; }
+        
+        .history-item { border-left: 5px solid var(--p); background: #fff; padding: 15px; margin-top: 12px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        h3, h4 { margin: 0 0 15px 0; color: var(--p); border-bottom: 2px solid #eee; padding-bottom: 10px; }
     </style>
 </head>
 <body>
 
-<div id="loader" class="loading-overlay">⌛ กำลังเชื่อมต่อฐานข้อมูล...</div>
+<div id="loader" class="loading-overlay">⌛ กำลังประมวลผลข้อมูล...</div>
 
 <div class="card">
     <h3>🚓 บันทึกเวรรับตัว</h3>
-    
     <label>📅 วันที่เดินทาง</label>
     <input type="date" id="travelDate">
 
     <label>📍 จังหวัดปลายทาง</label>
-    <input type="text" id="destination" placeholder="ระบุจังหวัด...">
+    <input type="text" id="destination" placeholder="ระบุจังหวัดปลายทาง...">
     
     <label>👮 เลือกเจ้าหน้าที่ (3-4 คน)</label>
     <div id="selectors">
@@ -42,7 +51,7 @@
         <select id="p3" class="sel"></select>
         <select id="p4" class="sel"></select>
     </div>
-    <button class="btn-ok" onclick="confirmDuty()">✅ บันทึกและส่งชื่อ</button>
+    <button class="btn-ok" onclick="confirmDuty()">✅ บันทึกข้อมูลลงฐานข้อมูล</button>
 </div>
 
 <div class="card">
@@ -50,21 +59,25 @@
         <h4>📊 สถานะชุดปัจจุบัน (<span id="count">0</span>/11)</h4>
         <button class="btn-reset" onclick="resetCycle()">🔄 รีเซ็ตคิว</button>
     </div>
-    <div id="statusList" style="margin-top:15px;"></div>
+    <div id="statusList"></div>
 </div>
 
-<div id="historyList"></div>
+<div id="historyContainer">
+    <h4 style="margin-left: 10px;">📋 ประวัติการเดินทาง</h4>
+    <div id="historyList"></div>
+</div>
 
 <script>
-    // *** 1. ใส่ URL ของคุณตรงนี้ ***
+    // *** 1. ใส่ Web App URL ของคุณที่ได้จาก Google Apps Script ตรงนี้ ***
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwAFf_TN74aDsxFFGKGFCoaQpvY25v8cyUWpzkfGrsfB343JzBSZj9hNxtM_LWzs_W3pw/exec"; 
 
     let officers = [];
     let history = [];
 
-    // ตั้งค่าวันที่เริ่มต้นเป็นวันนี้ (เพื่อให้เจ้าหน้าที่ไม่ต้องกดเลือกเองบ่อยๆ)
+    // ตั้งค่าวันที่เริ่มต้นเป็นวันนี้
     document.getElementById('travelDate').valueAsDate = new Date();
 
+    // โหลดข้อมูลจาก Google Sheets
     async function loadData() {
         showLoader(true);
         try {
@@ -73,10 +86,14 @@
             officers = data.officers || [];
             history = data.history || [];
             updateUI();
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error(e);
+            alert("⚠️ ไม่สามารถเชื่อมต่อฐานข้อมูลได้");
+        }
         showLoader(false);
     }
 
+    // บันทึกข้อมูลลง Google Sheets
     async function saveData() {
         showLoader(true);
         try {
@@ -86,20 +103,27 @@
                 body: JSON.stringify({ officers, history })
             });
             setTimeout(loadData, 1000);
-        } catch (e) { alert("❌ บันทึกไม่สำเร็จ"); showLoader(false); }
+        } catch (e) {
+            alert("❌ บันทึกข้อมูลล้มเหลว");
+            showLoader(false);
+        }
     }
 
+    // อัปเดตการแสดงผลหน้าจอ
     function updateUI() {
         const avai = officers.filter(o => !o.hasGone);
+        
+        // Dropdowns
         document.querySelectorAll('.sel').forEach((s, i) => {
-            const val = s.value;
-            s.innerHTML = `<option value="">-- คนที่ ${i+1} --</option>`;
+            const currentVal = s.value;
+            s.innerHTML = `<option value="">-- เลือกคนที่ ${i+1} --</option>`;
             avai.forEach(o => s.innerHTML += `<option value="${o.name}">${o.name}</option>`);
-            s.value = val;
+            s.value = currentVal;
         });
 
+        // รายชื่อเจ้าหน้าที่
         document.getElementById('statusList').innerHTML = officers.map(o => `
-            <div class="flex-between" style="margin-bottom:8px;">
+            <div class="flex-between" style="margin-bottom:8px; border-bottom:1px dashed #eee; padding-bottom:5px;">
                 <span>${o.name}</span>
                 <span class="status-badge ${o.hasGone ? 'busy':'available'}">${o.hasGone ? 'ไปแล้ว':'ว่าง'}</span>
             </div>
@@ -107,26 +131,45 @@
         
         document.getElementById('count').innerText = officers.filter(o => o.hasGone).length;
 
-        document.getElementById('historyList').innerHTML = history.map(h => {
-            // วันที่ภาษาไทยแบบย่อ
-            const d = new Date(h.date).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' });
-            const text = `📢 รายงานเวรรับตัว\n📅 วันที่: ${d}\n📍 จ. ${h.dest}\n👥 ${h.names}`;
-            const encodedText = encodeURIComponent(text);
-
-            return `
-                <div class="history-item">
-                    <div class="flex-between">
-                        <div>
-                            <strong>📍 ${h.dest} (${d})</strong><br>
-                            <small style="color:#666;">👥 ${h.names}</small>
+        // รายการประวัติ
+        let historyHTML = '';
+        if (history.length > 0) {
+            historyHTML += `<button class="btn-clear-all" onclick="clearAllHistory()">🗑️ ล้างประวัติทั้งหมด</button>`;
+            historyHTML += history.map((h, index) => {
+                const dateObj = new Date(h.date);
+                const dTh = dateObj.toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' });
+                const lineText = `📢 รายงานเวรรับตัว\n📅 วันที่: ${dTh}\n📍 จ. ${h.dest}\n👥 ${h.names}`;
+                
+                return `
+                    <div class="history-item">
+                        <div class="flex-between">
+                            <div style="flex:1;">
+                                <strong style="color:var(--p);">📍 ${h.dest}</strong> 
+                                <span style="font-size:0.85em; color:#666;">(${dTh})</span><br>
+                                <small style="color:#555;">👥 ${h.names}</small>
+                            </div>
+                            <div style="display:flex; gap:5px;">
+                                <button class="btn-line" onclick="sendLine('${encodeURIComponent(lineText)}')">🟢 LINE</button>
+                                <button class="btn-del" onclick="deleteHistory(${index})">🗑️</button>
+                            </div>
                         </div>
-                        <button class="btn-line" onclick="sendLine('${encodedText}')">🟢 LINE</button>
                     </div>
-                </div>
-            `;
-        }).join('');
+                `;
+            }).join('');
+        } else {
+            historyHTML = '<p style="text-align:center; color:#999; margin-top:20px;">ยังไม่มีประวัติการบันทึก</p>';
+        }
+        document.getElementById('historyList').innerHTML = historyHTML;
+
+        // เช็กถ้าวนครบทุกคน
+        if(officers.length > 0 && officers.every(o => o.hasGone)) {
+            alert("🎉 ครบทุกคนแล้ว! ระบบจะเริ่มรอบใหม่ให้อัตโนมัติ");
+            officers.forEach(o => o.hasGone = false);
+            saveData();
+        }
     }
 
+    // ฟังก์ชันบันทึก
     async function confirmDuty() {
         const tDate = document.getElementById('travelDate').value;
         const dest = document.getElementById('destination').value.trim();
@@ -137,7 +180,8 @@
             document.getElementById('p4').value
         ].filter(n => n !== "");
         
-        if(!tDate || !dest || sel.length < 3) return alert("⚠️ กรุณากรอกวันที่ จังหวัด และเจ้าหน้าที่ให้ครบ");
+        if(!tDate || !dest || sel.length < 3) return alert("⚠️ กรุณากรอกวันที่ จังหวัด และเลือกอย่างน้อย 3 คน");
+        if(new Set(sel).size !== sel.length) return alert("⚠️ ห้ามเลือกรายชื่อซ้ำกัน!");
 
         history.unshift({ date: tDate, dest: dest, names: sel.join(', ') });
         sel.forEach(name => {
@@ -149,23 +193,45 @@
         document.getElementById('destination').value = "";
     }
 
-    function sendLine(message) {
-        const lineUrl = "https://line.me/R/msg/text/?" + message;
-        const newWindow = window.open();
-        newWindow.opener = null;
-        newWindow.referrer = null;
-        newWindow.location.href = lineUrl;
+    // ฟังก์ชันส่ง LINE (แบบป้องกัน URL แถม)
+    function sendLine(encodedText) {
+        const lineUrl = "https://line.me/R/msg/text/?" + encodedText;
+        const nWindow = window.open();
+        nWindow.opener = null;
+        nWindow.referrer = null; // พยายามตัด referrer
+        nWindow.location.href = lineUrl;
     }
 
+    // ฟังก์ชันลบประวัติเฉพาะรายการ
+    async function deleteHistory(index) {
+        if (confirm("ลบประวัติรายการนี้ใช่หรือไม่?")) {
+            history.splice(index, 1);
+            await saveData();
+        }
+    }
+
+    // ฟังก์ชันล้างประวัติทั้งหมด
+    async function clearAllHistory() {
+        const check = prompt("พิมพ์ 'ลบทั้งหมด' เพื่อยืนยันการล้างประวัติ:");
+        if (check === "ลบทั้งหมด") {
+            history = [];
+            await saveData();
+        }
+    }
+
+    // ฟังก์ชันรีเซ็ตคิว
     async function resetCycle() {
-        if (confirm("ต้องการรีเซ็ตคิวเจ้าหน้าที่ทุกคนเป็น 'ว่าง' ใช่ไหม?")) {
+        if (confirm("ต้องการล้างสถานะเจ้าหน้าที่ทุกคนให้เป็น 'ว่าง' ใช่หรือไม่? (ประวัติจะไม่หาย)")) {
             officers.forEach(o => o.hasGone = false);
             await saveData();
         }
     }
 
-    function showLoader(show) { document.getElementById('loader').style.display = show ? 'flex' : 'none'; }
+    function showLoader(show) {
+        document.getElementById('loader').style.display = show ? 'flex' : 'none';
+    }
 
+    // เริ่มทำงานเมื่อเปิดเว็บ
     loadData();
 </script>
 </body>
