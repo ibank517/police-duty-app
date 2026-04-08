@@ -3,30 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบเวรตำรวจ v7.0 (Full Database & History Management)</title>
+    <title>ระบบเวรตำรวจ v7.1 (Security Mode)</title>
     <style>
         :root { --p: #2c3e50; --s: #27ae60; --w: #f39c12; --d: #e74c3c; --bg: #f4f7f6; }
         body { font-family: 'Sarabun', sans-serif; background: var(--bg); padding: 15px; margin: 0; padding-bottom: 50px; }
         .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        
         .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); display: none; justify-content: center; align-items: center; z-index: 100; font-weight: bold; color: var(--p); }
-        
         label { font-weight: bold; color: #555; font-size: 0.9em; display: block; margin-top: 10px; }
         select, input { width: 100%; padding: 12px; margin: 5px 0 10px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
-        
         button { width: 100%; padding: 15px; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; transition: 0.2s; }
         button:active { transform: scale(0.98); }
-        
         .btn-ok { background: var(--s); margin-top: 10px; }
         .btn-reset { background: var(--w); width: auto; padding: 5px 12px; font-size: 13px; }
         .btn-line { background: #00b900; padding: 8px 15px; font-size: 13px; width: auto; }
         .btn-del { background: var(--d); padding: 8px 12px; font-size: 13px; width: auto; }
         .btn-clear-all { background: #34495e; margin-bottom: 15px; font-size: 14px; padding: 10px; }
-
         .status-badge { padding: 3px 8px; border-radius: 10px; font-size: 0.8em; font-weight: bold; }
         .available { background: #d4edda; color: #155724; }
         .busy { background: #f8d7da; color: #721c24; }
-        
         .history-item { border-left: 5px solid var(--p); background: #fff; padding: 15px; margin-top: 12px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .flex-between { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
         h3, h4 { margin: 0 0 15px 0; color: var(--p); border-bottom: 2px solid #eee; padding-bottom: 10px; }
@@ -40,10 +34,8 @@
     <h3>🚓 บันทึกเวรรับตัว</h3>
     <label>📅 วันที่เดินทาง</label>
     <input type="date" id="travelDate">
-
     <label>📍 จังหวัดปลายทาง</label>
     <input type="text" id="destination" placeholder="ระบุจังหวัดปลายทาง...">
-    
     <label>👮 เลือกเจ้าหน้าที่ (3-4 คน)</label>
     <div id="selectors">
         <select id="p1" class="sel"></select>
@@ -68,16 +60,15 @@
 </div>
 
 <script>
-    // *** 1. ใส่ Web App URL ของคุณที่ได้จาก Google Apps Script ตรงนี้ ***
+    // 1. ตั้งค่าพื้นฐาน (ใส่ URL และ รหัสผ่านของคุณที่นี่)
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwAFf_TN74aDsxFFGKGFCoaQpvY25v8cyUWpzkfGrsfB343JzBSZj9hNxtM_LWzs_W3pw/exec"; 
+    const ADMIN_PASSWORD = "1234"; 
 
     let officers = [];
     let history = [];
 
-    // ตั้งค่าวันที่เริ่มต้นเป็นวันนี้
     document.getElementById('travelDate').valueAsDate = new Date();
 
-    // โหลดข้อมูลจาก Google Sheets
     async function loadData() {
         showLoader(true);
         try {
@@ -86,42 +77,27 @@
             officers = data.officers || [];
             history = data.history || [];
             updateUI();
-        } catch (e) {
-            console.error(e);
-            alert("⚠️ ไม่สามารถเชื่อมต่อฐานข้อมูลได้");
-        }
+        } catch (e) { alert("⚠️ เชื่อมต่อฐานข้อมูลไม่ได้"); }
         showLoader(false);
     }
 
-    // บันทึกข้อมูลลง Google Sheets
     async function saveData() {
         showLoader(true);
         try {
-            await fetch(SCRIPT_URL, {
-                method: "POST",
-                mode: "no-cors",
-                body: JSON.stringify({ officers, history })
-            });
+            await fetch(SCRIPT_URL, { method: "POST", mode: "no-cors", body: JSON.stringify({ officers, history }) });
             setTimeout(loadData, 1000);
-        } catch (e) {
-            alert("❌ บันทึกข้อมูลล้มเหลว");
-            showLoader(false);
-        }
+        } catch (e) { alert("❌ บันทึกล้มเหลว"); showLoader(false); }
     }
 
-    // อัปเดตการแสดงผลหน้าจอ
     function updateUI() {
         const avai = officers.filter(o => !o.hasGone);
-        
-        // Dropdowns
         document.querySelectorAll('.sel').forEach((s, i) => {
-            const currentVal = s.value;
+            const val = s.value;
             s.innerHTML = `<option value="">-- เลือกคนที่ ${i+1} --</option>`;
             avai.forEach(o => s.innerHTML += `<option value="${o.name}">${o.name}</option>`);
-            s.value = currentVal;
+            s.value = val;
         });
 
-        // รายชื่อเจ้าหน้าที่
         document.getElementById('statusList').innerHTML = officers.map(o => `
             <div class="flex-between" style="margin-bottom:8px; border-bottom:1px dashed #eee; padding-bottom:5px;">
                 <span>${o.name}</span>
@@ -131,107 +107,76 @@
         
         document.getElementById('count').innerText = officers.filter(o => o.hasGone).length;
 
-        // รายการประวัติ
-        let historyHTML = '';
+        let hHTML = '';
         if (history.length > 0) {
-            historyHTML += `<button class="btn-clear-all" onclick="clearAllHistory()">🗑️ ล้างประวัติทั้งหมด</button>`;
-            historyHTML += history.map((h, index) => {
-                const dateObj = new Date(h.date);
-                const dTh = dateObj.toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' });
+            hHTML += `<button class="btn-clear-all" onclick="clearAllHistory()">🗑️ ล้างประวัติทั้งหมด</button>`;
+            hHTML += history.map((h, i) => {
+                const dTh = new Date(h.date).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' });
                 const lineText = `📢 รายงานเวรรับตัว\n📅 วันที่: ${dTh}\n📍 จ. ${h.dest}\n👥 ${h.names}`;
-                
                 return `
                     <div class="history-item">
                         <div class="flex-between">
                             <div style="flex:1;">
-                                <strong style="color:var(--p);">📍 ${h.dest}</strong> 
-                                <span style="font-size:0.85em; color:#666;">(${dTh})</span><br>
-                                <small style="color:#555;">👥 ${h.names}</small>
+                                <strong>📍 ${h.dest}</strong> <span style="font-size:0.8em; color:#666;">(${dTh})</span><br>
+                                <small>👥 ${h.names}</small>
                             </div>
                             <div style="display:flex; gap:5px;">
                                 <button class="btn-line" onclick="sendLine('${encodeURIComponent(lineText)}')">🟢 LINE</button>
-                                <button class="btn-del" onclick="deleteHistory(${index})">🗑️</button>
+                                <button class="btn-del" onclick="deleteHistory(${i})">🗑️</button>
                             </div>
                         </div>
                     </div>
                 `;
             }).join('');
-        } else {
-            historyHTML = '<p style="text-align:center; color:#999; margin-top:20px;">ยังไม่มีประวัติการบันทึก</p>';
-        }
-        document.getElementById('historyList').innerHTML = historyHTML;
+        } else { hHTML = '<p style="text-align:center; color:#999;">ยังไม่มีประวัติ</p>'; }
+        document.getElementById('historyList').innerHTML = hHTML;
 
-        // เช็กถ้าวนครบทุกคน
         if(officers.length > 0 && officers.every(o => o.hasGone)) {
-            alert("🎉 ครบทุกคนแล้ว! ระบบจะเริ่มรอบใหม่ให้อัตโนมัติ");
+            alert("🎉 วนรอบครบทุกคนแล้ว! เริ่มต้นรอบใหม่");
             officers.forEach(o => o.hasGone = false);
             saveData();
         }
     }
 
-    // ฟังก์ชันบันทึก
     async function confirmDuty() {
         const tDate = document.getElementById('travelDate').value;
         const dest = document.getElementById('destination').value.trim();
-        const sel = [
-            document.getElementById('p1').value,
-            document.getElementById('p2').value,
-            document.getElementById('p3').value,
-            document.getElementById('p4').value
-        ].filter(n => n !== "");
-        
-        if(!tDate || !dest || sel.length < 3) return alert("⚠️ กรุณากรอกวันที่ จังหวัด และเลือกอย่างน้อย 3 คน");
-        if(new Set(sel).size !== sel.length) return alert("⚠️ ห้ามเลือกรายชื่อซ้ำกัน!");
-
+        const sel = [document.getElementById('p1').value, document.getElementById('p2').value, document.getElementById('p3').value, document.getElementById('p4').value].filter(n => n !== "");
+        if(!tDate || !dest || sel.length < 3) return alert("⚠️ กรอกข้อมูลไม่ครบ");
         history.unshift({ date: tDate, dest: dest, names: sel.join(', ') });
-        sel.forEach(name => {
-            const o = officers.find(x => x.name === name);
-            if(o) o.hasGone = true;
-        });
-
+        sel.forEach(name => { const o = officers.find(x => x.name === name); if(o) o.hasGone = true; });
         await saveData();
         document.getElementById('destination').value = "";
     }
 
-    // ฟังก์ชันส่ง LINE (แบบป้องกัน URL แถม)
     function sendLine(encodedText) {
-        const lineUrl = "https://line.me/R/msg/text/?" + encodedText;
-        const nWindow = window.open();
-        nWindow.opener = null;
-        nWindow.referrer = null; // พยายามตัด referrer
-        nWindow.location.href = lineUrl;
+        const url = "https://line.me/R/msg/text/?" + encodedText;
+        const nW = window.open(); nW.opener = null; nW.referrer = null; nW.location.href = url;
     }
 
-    // ฟังก์ชันลบประวัติเฉพาะรายการ
     async function deleteHistory(index) {
-        if (confirm("ลบประวัติรายการนี้ใช่หรือไม่?")) {
-            history.splice(index, 1);
-            await saveData();
-        }
+        const pw = prompt("กรุณาใส่รหัสผ่านเพื่อลบ:");
+        if (pw === ADMIN_PASSWORD) {
+            if (confirm("ลบรายการนี้ใช่หรือไม่?")) { history.splice(index, 1); await saveData(); }
+        } else if (pw !== null) { alert("❌ รหัสผ่านไม่ถูกต้อง"); }
     }
 
-    // ฟังก์ชันล้างประวัติทั้งหมด
     async function clearAllHistory() {
-        const check = prompt("พิมพ์ 'ลบทั้งหมด' เพื่อยืนยันการล้างประวัติ:");
-        if (check === "ลบทั้งหมด") {
-            history = [];
-            await saveData();
-        }
+        const pw = prompt("กรุณาใส่รหัสผ่านเพื่อล้างประวัติทั้งหมด:");
+        if (pw === ADMIN_PASSWORD) {
+            const check = prompt("พิมพ์ 'ลบทั้งหมด' เพื่อยืนยัน:");
+            if (check === "ลบทั้งหมด") { history = []; await saveData(); }
+        } else if (pw !== null) { alert("❌ รหัสผ่านไม่ถูกต้อง"); }
     }
 
-    // ฟังก์ชันรีเซ็ตคิว
     async function resetCycle() {
-        if (confirm("ต้องการล้างสถานะเจ้าหน้าที่ทุกคนให้เป็น 'ว่าง' ใช่หรือไม่? (ประวัติจะไม่หาย)")) {
-            officers.forEach(o => o.hasGone = false);
-            await saveData();
-        }
+        const pw = prompt("กรุณาใส่รหัสผ่านเพื่อรีเซ็ตคิว:");
+        if (pw === ADMIN_PASSWORD) {
+            if (confirm("รีเซ็ตสถานะทุกคนเป็น 'ว่าง' ใช่ไหม?")) { officers.forEach(o => o.hasGone = false); await saveData(); }
+        } else if (pw !== null) { alert("❌ รหัสผ่านไม่ถูกต้อง"); }
     }
 
-    function showLoader(show) {
-        document.getElementById('loader').style.display = show ? 'flex' : 'none';
-    }
-
-    // เริ่มทำงานเมื่อเปิดเว็บ
+    function showLoader(show) { document.getElementById('loader').style.display = show ? 'flex' : 'none'; }
     loadData();
 </script>
 </body>
